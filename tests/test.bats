@@ -10,6 +10,12 @@
   [[ "$v" =~ "2.8.2" ]]
 }
 
+@test "AWS CLI v1.11.146" {
+  v="$(aws --version 2>&1)"
+  [[ "$v" =~ "1.11.146" ]]
+}
+
+
 @test "Parse BLAST results" {
   python /usr/diamond/helpers/parse_blast.py --input /usr/diamond/tests/reads.blast --out output.json
   output="$(cat output.json)"
