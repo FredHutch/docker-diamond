@@ -20,10 +20,12 @@ def run_cmds(commands):
     exitcode = p.wait()
     if stdout:
         logging.info("Standard output of subprocess:")
-        logging.info(stdout)
+        for line in stdout.split('\n'):
+            logging.info(line)
     if stderr:
         logging.info("Standard error of subprocess:")
-        logging.info(stderr)
+        for line in stderr.split('\n'):
+            logging.info(line)
 
     # Check the exit code
     assert exitcode == 0, "Exit code {}".format(exitcode)
