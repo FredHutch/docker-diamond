@@ -11,13 +11,13 @@ from helpers.parse_blast import BlastParser
 
 def run_cmds(commands):
     """Run a set of commands and write out the log, combining the STDOUT and STDERR."""
+    logging.info("Commands:")
+    logging.info(' '.join(commands))
     p = subprocess.Popen(commands,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT)
     stdout, stderr = p.communicate()
     exitcode = p.wait()
-    logging.info("Commands:")
-    logging.info(' '.join(commands))
     if stdout:
         logging.info("Standard output of subprocess:")
         logging.info(stdout)
