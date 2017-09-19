@@ -5,6 +5,11 @@
   [[ "$v" =~ "0.9.10" ]]
 }
 
+@test "SRA Toolkit v2.8.2" {
+  v="$(fastq-dump --version)"
+  [[ "$v" =~ "2.8.2" ]]
+}
+
 @test "Parse BLAST results" {
   python /usr/diamond/helpers/parse_blast.py --input /usr/diamond/tests/reads.blast --out output.json
   output="$(cat output.json)"
