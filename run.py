@@ -9,7 +9,7 @@ import subprocess
 from helpers.parse_blast import BlastParser
 
 
-def run_cmds(commands, retry=True):
+def run_cmds(commands):
     """Run a set of commands and write out the log, combining the STDOUT and STDERR."""
     p = subprocess.Popen(commands,
                          stdout=subprocess.PIPE,
@@ -25,16 +25,8 @@ def run_cmds(commands, retry=True):
         logging.info("Standard error of subprocess:")
         logging.info(stderr)
 
-    # If the process failed, and the retry flag is set to True, retry the code
-    if exitcode != 0 and retry is True:
-        logging.info("Exit code was not 0, retrying")
-        run_cmds(commands, retry=False)
-    # Otherwise, check the exit code and write out the result
-    else:
-        if exitcode != 0:
-            # Shut down the logs
-            logging.shutdown()
-            assert exitcode == 0, "Exit code {}".format(exitcode)
+    # Check the exit code
+    assert exitcode == 0, "Exit code {}".format(exitcode)
 
 
 def calc_abund(input_str,
@@ -48,7 +40,7 @@ def calc_abund(input_str,
     """Align a set of reads against a reference database."""
 
     # Define the location of temporary file used for DIAMOND output
-    blast_fp = 'temp.blast'
+    blast_fp = os.path.join(temp_folder, 'temp.blast')
 
     # Make sure that the temporary file does not already exist
     if os.path.exists(blast_fp):
@@ -75,7 +67,7 @@ def calc_abund(input_str,
     logging.info("Parsing the output")
     parser = BlastParser(blast_fp)
     parser.parse()
-    abund_summary = parser.abund_summary()
+    abund_summary = parser.make_summary()
 
     os.unlink(blast_fp)
 
@@ -94,7 +86,7 @@ def calc_abund(input_str,
     }
 
     # Write out the final results as a JSON object and write them to the output folder
-    return_results(out, read_prefix, output_folder)
+    return_results(out, read_prefix, output_folder, temp_folder)
 
 
 def get_reads_from_url(input_str, temp_folder):
@@ -150,27 +142,20 @@ def get_reads_from_url(input_str, temp_folder):
 
 def get_reference_database(ref_db, temp_folder):
     """Get a reference database."""
+    assert ref_db.endswith('.dmnd'), "Ref DB must be *.dmnd ({})".format(ref_db)
     # Get files from AWS S3
     if ref_db.startswith('s3://'):
         logging.info("Getting reference database from S3: " + ref_db)
-        run_cmds(['aws', 's3', 'sync', ref_db, temp_folder])
-        # Now figure out which file is the DIAMOND database
-        for fp in os.listdir(temp_folder):
-            if fp.endswith('.dmnd'):
-                database_prefix = fp[:-5]
-                # Return the prefix for the reference database
-                return os.path.join(temp_folder, database_prefix)
+        run_cmds(['aws', 's3', 'cp', '--sse', 'AES256', ref_db, temp_folder])
 
-        # Raise an error if no .dmnd file was found
-        raise Exception("Please provide S3 directory containing a .dmnd file: " + input_str)
+        # Return the prefix for the reference database
+        database_prefix = ref_db.split('/')[-1][:-5]
+        return os.path.join(temp_folder, database_prefix)
+
     else:
         # Treat the input as a local path
         logging.info("Getting reference database from local path: " + ref_db)
-        # Strip off the .dmnd suffix, if provided
-        if ref_db.endswith('.dmnd'):
-            ref_db = ref_db[:-5]
-        # Make sure the path actually exists
-        assert os.path.exists(ref_db + '.dmnd')
+        assert os.path.exists(ref_db)
         return ref_db
 
 
@@ -185,11 +170,11 @@ def align_reads(read_fp,
     run_cmds(["diamond",
               "blastx",
               "--threads",
-              "{threads}",
+              str(threads),
               "--query",
-              "{read_fp}",
+              read_fp,
               "--db",
-              "{db_fp}",
+              db_fp,
               "--outfmt",
               "6",
               "qseqid",
@@ -199,27 +184,21 @@ def align_reads(read_fp,
               "send",
               "qseq",
               "--out",
-              "{blast_fp}",
+              blast_fp,
               "--top",
               "0",
               "--evalue",
-              "{evalue}",
+              str(evalue),
               "-b",
-              "{blocks}",
+              str(blocks),
               "--query-gencode",
-              "{query_gencode}".format(threads=threads,
-                                       read_fp=read_fp,
-                                       db_fp=db_fp,
-                                       blast_fp=blast_fp,
-                                       evalue=evalue,
-                                       blocks=blocks,
-                                       query_gencode=query_gencode)])
+              str(query_gencode)])
 
 
-def return_results(out, read_prefix, output_folder):
+def return_results(out, read_prefix, output_folder, temp_folder):
     """Write out the final results as a JSON object and write them to the output folder."""
     # Make a temporary file
-    temp_fp = os.path.join(output_folder, read_prefix + '.json')
+    temp_fp = os.path.join(temp_folder, read_prefix + '.json')
     with open(temp_fp, 'wt') as fo:
         json.dump(out, fo)
     # Compress the output
@@ -301,10 +280,12 @@ if __name__ == "__main__":
     rootLogger.addHandler(consoleHandler)
 
     # Set up the scratch space
+    logging.info("Setting up scratch space ({}Gb)".format(args.scratch_size))
     make_scratch_space(args.scratch_size, args.temp_folder)
 
     # Align each of the inputs and calculate the overall abundance
     for input_str in args.input.split(','):
+        logging.info("Processing input argument: " + input_str)
         calc_abund(input_str,
                    args.ref_db,
                    args.output_folder,
@@ -315,4 +296,5 @@ if __name__ == "__main__":
                    temp_folder=args.temp_folder)
 
     # Stop logging
+    logging.info("Done")
     logging.shutdown()
