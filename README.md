@@ -2,6 +2,9 @@
 Docker image running DIAMOND
 
 
+[![Docker Repository on Quay](https://quay.io/repository/fhcrc-microbiome/docker-diamond/status "Docker Repository on Quay")](https://quay.io/repository/fhcrc-microbiome/docker-diamond)
+
+
 This repository provides a Docker image for running DIAMOND that is compatible with automated analysis on AWS Batch. Specifically, this image includes a wrapper script that:
 
 
