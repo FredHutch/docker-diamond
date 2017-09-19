@@ -9,7 +9,7 @@ import subprocess
 from helpers.parse_blast import BlastParser
 
 
-def run_cmds(self, commands, retry=True):
+def run_cmds(commands, retry=True):
     """Run a set of commands and write out the log, combining the STDOUT and STDERR."""
     p = subprocess.Popen(commands,
                          stdout=subprocess.PIPE,
@@ -28,16 +28,18 @@ def run_cmds(self, commands, retry=True):
     # If the process failed, and the retry flag is set to True, retry the code
     if exitcode != 0 and retry is True:
         logging.info("Exit code was not 0, retrying")
-        self.run_cmds(commands, retry=False)
+        run_cmds(commands, retry=False)
     # Otherwise, check the exit code and write out the result
     else:
-        msg = "Exit code {}".format(exitcode)
-        assert exitcode == 0, msg
+        if exitcode != 0:
+            # Shut down the logs
+            logging.shutdown()
+            assert exitcode == 0, "Exit code {}".format(exitcode)
 
 
-def calc_abund(input_str=None,
-               ref_db=None,
-               output_folder=None,
+def calc_abund(input_str,
+               ref_db,
+               output_folder,
                evalue=0.00001,
                blocks=1,
                query_gencode=11,
@@ -45,32 +47,22 @@ def calc_abund(input_str=None,
                temp_folder='/mnt/temp'):
     """Align a set of reads against a reference database."""
 
-    # Define the location of temporary files used
-    log_fp = 'temp.txt'
+    # Define the location of temporary file used for DIAMOND output
     blast_fp = 'temp.blast'
 
-    # Make sure that the temporary files do not already exist
-    for fp in [log_fp, blast_fp]:
-        if os.path.exists(fp):
-            os.unlink(fp)
-
-    # Set up logging
-    logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s [run.py] %(message)s')
-    rootLogger = logging.getLogger()
-    rootLogger.setLevel(logging.INFO)
-
-    # Write to file
-    fileHandler = logging.FileHandler(log_fp)
-    fileHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(fileHandler)
+    # Make sure that the temporary file does not already exist
+    if os.path.exists(blast_fp):
+        os.unlink(blast_fp)
 
     # Get the reads
     read_fp, read_prefix = get_reads_from_url(input_str, temp_folder)
 
     # Get the reference database
     db_fp = get_reference_database(ref_db, temp_folder)
+    logging.info("Reference database: " + db_fp)
 
     # Align the reads against the reference database
+    logging.info("Aligning reads")
     align_reads(read_fp,
                 db_fp,
                 blast_fp,
@@ -80,11 +72,15 @@ def calc_abund(input_str=None,
                 query_gencode=query_gencode)
 
     # Parse the alignment to get the abundance summary statistics
-    parser = DiamondParser(blast_fp)
+    logging.info("Parsing the output")
+    parser = BlastParser(blast_fp)
     parser.parse()
     abund_summary = parser.abund_summary()
 
+    os.unlink(blast_fp)
+
     # Read in the logs
+    logging.info("Reading in the logs")
     logs = open(log_fp, 'rt').readlines()
 
     # Make an object with all of the results
@@ -100,36 +96,35 @@ def calc_abund(input_str=None,
     # Write out the final results as a JSON object and write them to the output folder
     return_results(out, read_prefix, output_folder)
 
-    # Stop logging
-    logging.shutdown()
-
-    # Clean up all of the temporary files
-    for fp in [log_fp, blast_fp]:
-        if os.path.exists(fp):
-            os.unlink(fp)
-
 
 def get_reads_from_url(input_str, temp_folder):
     """Get a set of reads from a URL -- return the downloaded filepath and file prefix."""
+    logging.info("Getting reads from {}".format(input_str))
     error_msg = "{} must start with s3://, sra://, or ftp://".format(input_str)
-    assert input_str.startswith(('sra://', 'ftp://')), error_msg
+    assert input_str.startswith(('s3://', 'sra://', 'ftp://')), error_msg
 
     filename = input_str.split('/')[-1]
     local_path = os.path.join(temp_folder, filename)
 
+    logging.info("Filename: " + filename)
+    logging.info("Local path: " + local_path)
+
     # Get files from AWS S3
     if input_str.startswith('s3://'):
-        run_cmds(['aws', 's3', 'cp', input_str, temp_folder])
+        logging.info("Getting reads from S3")
+        run_cmds(['aws', 's3', 'cp', '--sse', 'AES256', input_str, temp_folder])
         return local_path, filename
 
     # Get files from an FTP server
     elif input_str.startswith('ftp://'):
+        logging.info("Getting reads from FTP")
         run_cmds(['wget', '-P', temp_folder, input_str])
         return local_path, filename
 
     # Get files from SRA
     elif input_str.startswith('sra://'):
         accession = input_str[6:]
+        logging.info("Getting reads from SRA: " + accession)
         local_path = os.path.join(temp_folder, accession + ".fastq")
         # Download from NCBI
         run_cmds(["fastq-dump",
@@ -142,6 +137,7 @@ def get_reads_from_url(input_str, temp_folder):
                   "--outdir",
                   temp_folder,
                   accession])
+
         # Rename the file (which automatically has '_pass' included)
         run_cmds(["mv",
                   os.path.join(temp_folder, accession + "_pass.fastq"),
@@ -154,11 +150,9 @@ def get_reads_from_url(input_str, temp_folder):
 
 def get_reference_database(ref_db, temp_folder):
     """Get a reference database."""
-    error_msg = "{} must start with s3://".format(input_str)
-    assert input_str.startswith(('s3://')), error_msg
-
     # Get files from AWS S3
-    if input_str.startswith('s3://'):
+    if ref_db.startswith('s3://'):
+        logging.info("Getting reference database from S3: " + ref_db)
         run_cmds(['aws', 's3', 'sync', ref_db, temp_folder])
         # Now figure out which file is the DIAMOND database
         for fp in os.listdir(temp_folder):
@@ -167,8 +161,17 @@ def get_reference_database(ref_db, temp_folder):
                 # Return the prefix for the reference database
                 return os.path.join(temp_folder, database_prefix)
 
-    # Raise an error if no .dmnd file was found
-    raise Exception("Please provide S3 directory containing a .dmnd file: " + input_str)
+        # Raise an error if no .dmnd file was found
+        raise Exception("Please provide S3 directory containing a .dmnd file: " + input_str)
+    else:
+        # Treat the input as a local path
+        logging.info("Getting reference database from local path: " + ref_db)
+        # Strip off the .dmnd suffix, if provided
+        if ref_db.endswith('.dmnd'):
+            ref_db = ref_db[:-5]
+        # Make sure the path actually exists
+        assert os.path.exists(ref_db + '.dmnd')
+        return ref_db
 
 
 def align_reads(read_fp,
@@ -225,7 +228,7 @@ def return_results(out, read_prefix, output_folder):
 
     if output_folder.startswith('s3://'):
         # Copy to S3
-        run_cmds(['aws', 's3', 'cp', temp_fp, output_folder])
+        run_cmds(['aws', 's3', 'cp', '--sse', 'AES256', temp_fp, output_folder])
     else:
         # Copy to local folder
         run_cmds(['mv', temp_fp, output_folder])
@@ -282,16 +285,34 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Set up logging
+    log_fp = 'log.txt'
+    logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s [run.py] %(message)s')
+    rootLogger = logging.getLogger()
+    rootLogger.setLevel(logging.INFO)
+
+    # Write to file
+    fileHandler = logging.FileHandler(log_fp)
+    fileHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(fileHandler)
+    # Also write to STDOUT
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleHandler)
+
     # Set up the scratch space
     make_scratch_space(args.scratch_size, args.temp_folder)
 
     # Align each of the inputs and calculate the overall abundance
     for input_str in args.input.split(','):
-        calc_abund(input=input_str,
-                   ref_db=args.ref_db,
-                   output_folder=args.output_folder,
+        calc_abund(input_str,
+                   args.ref_db,
+                   args.output_folder,
                    evalue=args.evalue,
                    blocks=args.blocks,
                    query_gencode=args.query_gencode,
                    threads=args.threads,
                    temp_folder=args.temp_folder)
+
+    # Stop logging
+    logging.shutdown()
