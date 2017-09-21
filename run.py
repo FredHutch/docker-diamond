@@ -229,15 +229,15 @@ if __name__ == "__main__":
     parser.add_argument("--input",
                         type=str,
                         help="""Location for input file(s). Comma-separated.
-                                (Supported: sra://, ftp://).""")
+                                (Supported: sra://, s3://, or ftp://).""")
     parser.add_argument("--ref-db",
                         type=str,
                         help="""Folder containing reference database.
-                                (Supported: s3://, ftp://).""")
+                                (Supported: s3://, ftp://, or local path).""")
     parser.add_argument("--output-folder",
                         type=str,
                         help="""Folder to place results.
-                                (Supported: s3://, ftp://).""")
+                                (Supported: s3://, or local path).""")
     parser.add_argument("--scratch-size",
                         type=int,
                         default=20,
