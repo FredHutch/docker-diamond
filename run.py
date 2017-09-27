@@ -32,7 +32,8 @@ def run_cmds(commands):
 
 
 def calc_abund(input_str,
-               ref_db,
+               db_fp,
+               db_url,
                output_folder,
                evalue=0.00001,
                blocks=1,
@@ -51,10 +52,6 @@ def calc_abund(input_str,
     # Get the reads
     read_fp, read_prefix = get_reads_from_url(input_str, temp_folder)
 
-    # Get the reference database
-    db_fp = get_reference_database(ref_db, temp_folder)
-    logging.info("Reference database: " + db_fp)
-
     # Align the reads against the reference database
     logging.info("Aligning reads")
     align_reads(read_fp,
@@ -72,6 +69,7 @@ def calc_abund(input_str,
     abund_summary = parser.make_summary()
 
     os.unlink(blast_fp)
+    os.unlink(read_fp)
 
     # Read in the logs
     logging.info("Reading in the logs")
@@ -83,7 +81,7 @@ def calc_abund(input_str,
         "input": read_prefix,
         "output_folder": output_folder,
         "logs": logs,
-        "ref_db": ref_db,
+        "ref_db": db_fp,
         "results": abund_summary
     }
 
@@ -240,8 +238,8 @@ if __name__ == "__main__":
                                 (Supported: s3://, or local path).""")
     parser.add_argument("--scratch-size",
                         type=int,
-                        default=20,
-                        help="Size of scratch space created with ramdisk (Gb).")
+                        default=None,
+                        help="If specified, create a ramdisk of this size (Gb).")
     parser.add_argument("--evalue",
                         type=float,
                         default=0.00001,
@@ -261,8 +259,8 @@ if __name__ == "__main__":
                         help="Number of threads to use aligning.")
     parser.add_argument("--temp-folder",
                         type=str,
-                        default='/mnt/temp',
-                        help="Folder used to mount ramdisk used for temporary files.")
+                        default='/share',
+                        help="Folder used for temporary files (and ramdisk, if specified).")
 
     args = parser.parse_args()
 
@@ -282,20 +280,30 @@ if __name__ == "__main__":
     rootLogger.addHandler(consoleHandler)
 
     # Set up the scratch space
-    logging.info("Setting up scratch space ({}Gb)".format(args.scratch_size))
-    make_scratch_space(args.scratch_size, args.temp_folder)
+    if args.scratch_size is not None:
+        logging.info("Setting up scratch space ({}Gb)".format(args.scratch_size))
+        make_scratch_space(args.scratch_size, args.temp_folder)
+
+    # Get the reference database
+    db_fp = get_reference_database(args.ref_db, args.temp_folder)
+    logging.info("Reference database: " + db_fp)
 
     # Align each of the inputs and calculate the overall abundance
     for input_str in args.input.split(','):
         logging.info("Processing input argument: " + input_str)
-        calc_abund(input_str,
-                   args.ref_db,
-                   args.output_folder,
+        calc_abund(input_str,              # ID for single sample to process
+                   db_fp,                  # Local path to DB
+                   args.ref_db,            # URL of ref DB, used for logging
+                   args.output_folder,     # Place to put results
                    evalue=args.evalue,
                    blocks=args.blocks,
                    query_gencode=args.query_gencode,
                    threads=args.threads,
                    temp_folder=args.temp_folder)
+
+    # Delete the reference database
+    logging.info("Deleting reference database: {}.dmnd".format(db_fp))
+    os.unlink(db_fp + ".dmnd")
 
     # Stop logging
     logging.info("Done")
