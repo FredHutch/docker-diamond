@@ -104,7 +104,7 @@ def get_reads_from_url(input_str, temp_folder):
     # Get files from AWS S3
     if input_str.startswith('s3://'):
         logging.info("Getting reads from S3")
-        run_cmds(['aws', 's3', 'cp', '--sse', 'AES256', input_str, temp_folder])
+        run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', input_str, temp_folder])
         return local_path, filename
 
     # Get files from an FTP server
@@ -146,7 +146,7 @@ def get_reference_database(ref_db, temp_folder):
     # Get files from AWS S3
     if ref_db.startswith('s3://'):
         logging.info("Getting reference database from S3: " + ref_db)
-        run_cmds(['aws', 's3', 'cp', '--sse', 'AES256', ref_db, temp_folder])
+        run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', ref_db, temp_folder])
 
         # Return the prefix for the reference database
         database_prefix = ref_db.split('/')[-1][:-5]
@@ -207,7 +207,7 @@ def return_results(out, read_prefix, output_folder, temp_folder):
 
     if output_folder.startswith('s3://'):
         # Copy to S3
-        run_cmds(['aws', 's3', 'cp', '--sse', 'AES256', temp_fp, output_folder])
+        run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', temp_fp, output_folder])
     else:
         # Copy to local folder
         run_cmds(['mv', temp_fp, output_folder])
