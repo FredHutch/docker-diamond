@@ -179,6 +179,9 @@ def get_reference_database(ref_db, temp_folder):
         # Save the database to a local path with a random string prefix, to avoid collision
         random_string = uuid.uuid4()
         local_fp = os.path.join(temp_folder, "{}.{}".format(random_string, ref_db.split('/')[-1]))
+
+        assert os.path.exists(local_fp) is False
+
         logging.info("Saving database to " + local_fp)
         run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', ref_db, local_fp])
 
