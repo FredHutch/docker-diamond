@@ -119,6 +119,8 @@ def get_reads_from_url(input_str, temp_folder):
         logging.info("Getting reads from SRA: " + accession)
         local_path = os.path.join(temp_folder, accession + ".fastq")
         # Download from NCBI
+        run_cmds(["prefetch",
+                  accession])
         run_cmds(["fastq-dump",
                   "--skip-technical",
                   "--readids",
@@ -134,6 +136,12 @@ def get_reads_from_url(input_str, temp_folder):
         run_cmds(["mv",
                   os.path.join(temp_folder, accession + "_pass.fastq"),
                   local_path])
+
+        # Clean up the cached *.sra file
+        if os.path.exists('/root/ncbi/public/sra/{}.sra'.format(accession)):
+            logging.info("Cleaning up cached SRA file")
+            os.unlink('/root/ncbi/public/sra/{}.sra'.format(accession))
+
         return local_path, accession
 
     else:
