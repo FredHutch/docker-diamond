@@ -3,6 +3,7 @@
 
 import os
 import json
+import boto3
 import logging
 import argparse
 import subprocess
@@ -42,12 +43,31 @@ def calc_abund(input_str,
                temp_folder='/mnt/temp'):
     """Align a set of reads against a reference database."""
 
+    # Use the read prefix to name the output and temporary files
+    read_prefix = input_str.split('/')[-1]
+
     # Define the location of temporary file used for DIAMOND output
-    blast_fp = os.path.join(temp_folder, 'temp.blast')
+    blast_fp = os.path.join(temp_folder, '{}.blast'.format(read_prefix))
 
     # Make sure that the temporary file does not already exist
-    if os.path.exists(blast_fp):
-        os.unlink(blast_fp)
+    assert os.path.exists(blast_fp) is False, "Alignment file already exists"
+
+    # Check to see if the output already exists, if so, skip this sample
+    output_fp = output_folder.rstrip('/') + '/' + read_prefix + '.json.gz'
+    if output_fp.startswith('s3://'):
+        # Check S3
+        bucket = output_fp[6:].split('/')[0]
+        prefix = '/'.join(output_fp[6:].split('/')[1:])
+        client = boto3.client('s3')
+        results = client.list_objects(Bucket=bucket, Prefix=prefix)
+        if 'Contents' in results:
+            logging.info("Output already exists, skipping ({})".format(output_fp))
+            return
+    else:
+        # Check local filesystem
+        if os.path.exists(output_fp):
+            logging.info("Output already exists, skipping ({})".format(output_fp))
+            return
 
     # Get the reads
     read_fp, read_prefix = get_reads_from_url(input_str, temp_folder)
@@ -105,17 +125,17 @@ def get_reads_from_url(input_str, temp_folder):
     if input_str.startswith('s3://'):
         logging.info("Getting reads from S3")
         run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', input_str, temp_folder])
-        return local_path, filename
+        return local_path
 
     # Get files from an FTP server
     elif input_str.startswith('ftp://'):
         logging.info("Getting reads from FTP")
         run_cmds(['wget', '-P', temp_folder, input_str])
-        return local_path, filename
+        return local_path
 
     # Get files from SRA
     elif input_str.startswith('sra://'):
-        accession = input_str[6:]
+        accession = filename
         logging.info("Getting reads from SRA: " + accession)
         local_path = os.path.join(temp_folder, accession + ".fastq")
         # Download from NCBI
@@ -142,7 +162,7 @@ def get_reads_from_url(input_str, temp_folder):
             logging.info("Cleaning up cached SRA file")
             os.unlink('/root/ncbi/public/sra/{}.sra'.format(accession))
 
-        return local_path, accession
+        return local_path
 
     else:
         raise Exception("Did not recognize prefix to fetch reads: " + input_str)
