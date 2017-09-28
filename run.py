@@ -3,6 +3,7 @@
 
 import os
 import json
+import uuid
 import boto3
 import logging
 import argparse
@@ -70,7 +71,7 @@ def calc_abund(input_str,
             return
 
     # Get the reads
-    read_fp, read_prefix = get_reads_from_url(input_str, temp_folder)
+    read_fp = get_reads_from_url(input_str, temp_folder)
 
     # Align the reads against the reference database
     logging.info("Aligning reads")
@@ -84,7 +85,7 @@ def calc_abund(input_str,
 
     # Parse the alignment to get the abundance summary statistics
     logging.info("Parsing the output")
-    parser = BlastParser(blast_fp)
+    parser = BlastParser(blast_fp, logging=logging)
     parser.parse()
     abund_summary = parser.make_summary()
 
@@ -174,17 +175,27 @@ def get_reference_database(ref_db, temp_folder):
     # Get files from AWS S3
     if ref_db.startswith('s3://'):
         logging.info("Getting reference database from S3: " + ref_db)
-        run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', ref_db, temp_folder])
 
-        # Return the prefix for the reference database
-        database_prefix = ref_db.split('/')[-1][:-5]
-        return os.path.join(temp_folder, database_prefix)
+        # Save the database to a local path with a random string prefix, to avoid collision
+        random_string = uuid.uuid4()
+        local_fp = os.path.join(temp_folder, "{}.{}".format(random_string, ref_db.split('/')[-1]))
+        logging.info("Saving database to " + local_fp)
+        run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', ref_db, local_fp])
+
+        # If the database was downloaded from S3, delete it when finished
+        delete_db_when_finished = True
+
+        return local_fp[:-5], delete_db_when_finished
 
     else:
         # Treat the input as a local path
         logging.info("Getting reference database from local path: " + ref_db)
         assert os.path.exists(ref_db)
-        return ref_db
+
+        # Don't delete this database when finished
+        delete_db_when_finished = False
+
+        return ref_db, delete_db_when_finished
 
 
 def align_reads(read_fp,
@@ -313,7 +324,7 @@ if __name__ == "__main__":
         make_scratch_space(args.scratch_size, args.temp_folder)
 
     # Get the reference database
-    db_fp = get_reference_database(args.ref_db, args.temp_folder)
+    db_fp, delete_db_when_finished = get_reference_database(args.ref_db, args.temp_folder)
     logging.info("Reference database: " + db_fp)
 
     # Align each of the inputs and calculate the overall abundance
@@ -330,8 +341,9 @@ if __name__ == "__main__":
                    temp_folder=args.temp_folder)
 
     # Delete the reference database
-    logging.info("Deleting reference database: {}.dmnd".format(db_fp))
-    os.unlink(db_fp + ".dmnd")
+    if delete_db_when_finished:
+        logging.info("Deleting reference database: {}.dmnd".format(db_fp))
+        os.unlink(db_fp + ".dmnd")
 
     # Stop logging
     logging.info("Done")
