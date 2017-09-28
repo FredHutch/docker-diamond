@@ -57,8 +57,9 @@ def calc_abund(input_str,
     output_fp = output_folder.rstrip('/') + '/' + read_prefix + '.json.gz'
     if output_fp.startswith('s3://'):
         # Check S3
-        bucket = output_fp[6:].split('/')[0]
-        prefix = '/'.join(output_fp[6:].split('/')[1:])
+        logging.info("Making sure that the output path doesn't already exist on S3")
+        bucket = output_fp[5:].split('/')[0]
+        prefix = '/'.join(output_fp[5:].split('/')[1:])
         client = boto3.client('s3')
         results = client.list_objects(Bucket=bucket, Prefix=prefix)
         if 'Contents' in results:
