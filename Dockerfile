@@ -3,7 +3,7 @@ MAINTAINER sminot@fredhutch.org
 
 # Install prerequisites
 RUN apt update && \
-	apt-get install -y build-essential wget unzip python2.7 python-dev git python-pip bats awscli
+	apt-get install -y build-essential wget unzip python2.7 python-dev git python-pip bats awscli curl
 
 # Use /share as the working directory
 RUN mkdir /share

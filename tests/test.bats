@@ -11,6 +11,11 @@
 }
 
 
+@test "Curl v7.47.0" {
+  v="$(curl --version)"
+  [[ "$v" =~ "7.47.0" ]]
+}
+
 @test "Parse BLAST results" {
   python /usr/diamond/helpers/parse_blast.py --input /usr/diamond/tests/reads.blast --out output.json
   output="$(cat output.json)"
