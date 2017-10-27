@@ -26,14 +26,6 @@ RUN cd /usr/diamond && \
 	rm diamond-linux64.tar.gz
 
 
-# Install the SRA toolkit
-RUN cd /usr/local/bin && \
-	wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/2.8.2/sratoolkit.2.8.2-ubuntu64.tar.gz && \
-	tar xzvf sratoolkit.2.8.2-ubuntu64.tar.gz && \
-	ln -s /usr/local/bin/sratoolkit.2.8.2-ubuntu64/bin/* /usr/local/bin/ && \
-	rm sratoolkit.2.8.2-ubuntu64.tar.gz
-
-
 # Add the run script to the PATH
 RUN cd /usr/diamond && \
 	chmod +x run.py && \
