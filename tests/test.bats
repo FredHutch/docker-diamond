@@ -5,6 +5,13 @@
   [[ "$v" =~ "0.9.10" ]]
 }
 
+
+@test "SRA Toolkit v2.8.2" {
+  v="$(fastq-dump --version)"
+  [[ "$v" =~ "2.8.2" ]]
+}
+
+
 @test "AWS CLI v1.11.146" {
   v="$(aws --version 2>&1)"
   [[ "$v" =~ "1.11.146" ]]

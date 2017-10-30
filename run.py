@@ -148,23 +148,30 @@ def get_sra(accession, temp_folder):
         run_cmds(["curl",
                   "-o", os.path.join(temp_folder, accession + end),
                   url + end], catchExcept=True)
-    # Make sure that at least one of them downloaded
-    assert any([os.path.exists("{}/{}{}".format(temp_folder, accession, end))
-                for end in file_endings])
+    # If none of those URLs downloaded, fall back to trying NCBI
+    if any([os.path.exists("{}/{}{}".format(temp_folder, accession, end))
+            for end in file_endings]):
+        # Combine them all into a single file
+        logging.info("Combining into a single FASTQ file")
+        with open(local_path, "wt") as fo:
+            cmd = "gunzip -c {}/{}*fastq.gz".format(temp_folder, accession)
+            gunzip = subprocess.Popen(cmd, shell=True, stdout=fo)
+            gunzip.wait()
 
-    # Combine them all into a single file
-    logging.info("Combining into a single FASTQ file")
-    with open(local_path, "wt") as fo:
-        cmd = "gunzip -c {}/{}*fastq.gz".format(temp_folder, accession)
-        gunzip = subprocess.Popen(cmd, shell=True, stdout=fo)
-        gunzip.wait()
+        # Clean up the temporary files
+        logging.info("Cleaning up temporary files")
+        for end in file_endings:
+            fp = "{}/{}{}".format(temp_folder, accession, end)
+            if os.path.exists(fp):
+                os.unlink(fp)
+    else:
+        logging.info("No files found on ENA, trying SRA")
+        run_cmds(["fastq-dump", "--outdir", temp_folder, accession])
 
-    # Clean up the temporary files
-    logging.info("Cleaning up temporary files")
-    for end in file_endings:
-        fp = "{}/{}{}".format(temp_folder, accession, end)
-        if os.path.exists(fp):
-            os.unlink(fp)
+        # Check to see if the file was downloaded
+        msg = "File could not be downloaded from SRA: {}".format(accession)
+        assert os.path.exists(local_path), msg
+
     # Return the path to the file
     logging.info("Done fetching " + accession)
     return local_path
