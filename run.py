@@ -2,6 +2,7 @@
 """Align a set of reads against a reference database with DIAMOND, and save the results."""
 
 import os
+import time
 import json
 import uuid
 import boto3
@@ -51,6 +52,9 @@ def calc_abund(input_str,
                threads=16,
                temp_folder='/mnt/temp'):
     """Align a set of reads against a reference database."""
+
+    # Record the start time
+    start_time = time.time()
 
     # Use the read prefix to name the output and temporary files
     read_prefix = input_str.split('/')[-1]
@@ -113,7 +117,8 @@ def calc_abund(input_str,
         "logs": logs,
         "ref_db": db_fp,
         "results": abund_summary,
-        "aligned_reads": aligned_reads
+        "aligned_reads": aligned_reads,
+        "time_elapsed": time.time() - start_time
     }
 
     # Write out the final results as a JSON object and write them to the output folder
