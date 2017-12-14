@@ -50,7 +50,8 @@ def calc_abund(input_str,
                blocks=1,
                query_gencode=11,
                threads=16,
-               temp_folder='/mnt/temp'):
+               temp_folder='/mnt/temp',
+               overwrite=False):
     """Align a set of reads against a reference database."""
 
     # Record the start time
@@ -75,13 +76,19 @@ def calc_abund(input_str,
         client = boto3.client('s3')
         results = client.list_objects(Bucket=bucket, Prefix=prefix)
         if 'Contents' in results:
-            logging.info("Output already exists, skipping ({})".format(output_fp))
-            return
+            if overwrite:
+                logging.info("Overwriting output ({})".format(output_fp))
+            else:
+                logging.info("Output already exists, skipping ({})".format(output_fp))
+                return
     else:
         # Check local filesystem
         if os.path.exists(output_fp):
-            logging.info("Output already exists, skipping ({})".format(output_fp))
-            return
+            if overwrite:
+                logging.info("Overwriting output ({})".format(output_fp))
+            else:
+                logging.info("Output already exists, skipping ({})".format(output_fp))
+                return
 
     # Get the reads
     read_fp = get_reads_from_url(input_str, temp_folder)
@@ -328,6 +335,9 @@ if __name__ == "__main__":
                         type=str,
                         help="""Folder to place results.
                                 (Supported: s3://, or local path).""")
+    parser.add_argument("--overwrite",
+                        action="store_true",
+                        help="""Overwrite output files. Off by default.""")
     parser.add_argument("--scratch-size",
                         type=int,
                         default=None,
@@ -391,7 +401,8 @@ if __name__ == "__main__":
                    blocks=args.blocks,
                    query_gencode=args.query_gencode,
                    threads=args.threads,
-                   temp_folder=args.temp_folder)
+                   temp_folder=args.temp_folder,
+                   overwrite=args.overwrite)
 
     # Delete the reference database
     if delete_db_when_finished:
