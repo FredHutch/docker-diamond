@@ -96,7 +96,7 @@ def calc_abund(input_str,
     logging.info("Parsing the output")
     parser = BlastParser(blast_fp, logging=logging)
     parser.parse()
-    abund_summary = parser.make_summary()
+    aligned_reads, abund_summary = parser.make_summary()
 
     os.unlink(blast_fp)
     os.unlink(read_fp)
@@ -112,7 +112,8 @@ def calc_abund(input_str,
         "output_folder": output_folder,
         "logs": logs,
         "ref_db": db_fp,
-        "results": abund_summary
+        "results": abund_summary,
+        "aligned_reads": aligned_reads
     }
 
     # Write out the final results as a JSON object and write them to the output folder

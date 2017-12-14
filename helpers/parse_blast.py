@@ -45,7 +45,7 @@ class BlastParser:
         self.total_pos = defaultdict(set)
         self.unique_pos = defaultdict(set)
 
-        # Keep track of the total number of aligned reads
+        # Keep track of the total number of reads +/- alignment
         self.total_aligned_reads = 0
 
         # The total length of each reference
@@ -175,7 +175,7 @@ class BlastParser:
 
             out.append(d)
 
-        return out
+        return self.total_aligned_reads, out
 
     def rpkm(self, reads, ref_len, total_reads, amino_acid_ref=True):
         """Calculate RPKM (reads per kilobase per million reads)."""
