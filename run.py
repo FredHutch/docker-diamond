@@ -2,12 +2,14 @@
 """Align a set of reads against a reference database with DIAMOND, and save the results."""
 
 import os
+import sys
 import time
 import json
 import uuid
 import boto3
 import logging
 import argparse
+import traceback
 import subprocess
 from helpers.parse_blast import BlastParser
 
@@ -51,6 +53,7 @@ def calc_abund(input_str,
                query_gencode=11,
                threads=16,
                temp_folder='/mnt/temp',
+               random_string=uuid.uuid4(),
                overwrite=False):
     """Align a set of reads against a reference database."""
 
@@ -61,7 +64,9 @@ def calc_abund(input_str,
     read_prefix = input_str.split('/')[-1]
 
     # Define the location of temporary file used for DIAMOND output
-    blast_fp = os.path.join(temp_folder, '{}.blast'.format(read_prefix))
+    blast_fp = os.path.join(
+        temp_folder,
+        '{}-{}.blast'.format(random_string, read_prefix))
 
     # Make sure that the temporary file does not already exist
     assert os.path.exists(blast_fp) is False, "Alignment file already exists"
@@ -91,7 +96,11 @@ def calc_abund(input_str,
                 return
 
     # Get the reads
-    read_fp = get_reads_from_url(input_str, temp_folder)
+    read_fp = get_reads_from_url(
+        input_str,
+        temp_folder,
+        random_string=random_string
+    )
 
     # Align the reads against the reference database
     logging.info("Aligning reads")
@@ -190,7 +199,7 @@ def get_sra(accession, temp_folder):
     return local_path
 
 
-def get_reads_from_url(input_str, temp_folder):
+def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
     """Get a set of reads from a URL -- return the downloaded filepath and file prefix."""
     logging.info("Getting reads from {}".format(input_str))
     error_msg = "{} must start with s3://, sra://, or ftp://".format(input_str)
@@ -206,13 +215,11 @@ def get_reads_from_url(input_str, temp_folder):
     if input_str.startswith('s3://'):
         logging.info("Getting reads from S3")
         run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', input_str, temp_folder])
-        return local_path
 
     # Get files from an FTP server
     elif input_str.startswith('ftp://'):
         logging.info("Getting reads from FTP")
         run_cmds(['wget', '-P', temp_folder, input_str])
-        return local_path
 
     # Get files from SRA
     elif input_str.startswith('sra://'):
@@ -220,13 +227,19 @@ def get_reads_from_url(input_str, temp_folder):
         logging.info("Getting reads from SRA: " + accession)
         local_path = get_sra(accession, temp_folder)
 
-        return local_path
-
     else:
         raise Exception("Did not recognize prefix to fetch reads: " + input_str)
 
+    # Add a random string to the filename
+    new_path = local_path.split('/')
+    new_path[-1] = "{}-{}".format(random_string, new_path[-1])
+    new_path = '/'.join(new_path)
+    logging.info("Moving {} to {}".format(local_path, new_path))
+    os.rename(local_path, new_path)
+    return new_path
 
-def get_reference_database(ref_db, temp_folder):
+
+def get_reference_database(ref_db, temp_folder, random_string=uuid.uuid4()):
     """Get a reference database."""
     assert ref_db.endswith('.dmnd'), "Ref DB must be *.dmnd ({})".format(ref_db)
     # Get files from AWS S3
@@ -234,7 +247,6 @@ def get_reference_database(ref_db, temp_folder):
         logging.info("Getting reference database from S3: " + ref_db)
 
         # Save the database to a local path with a random string prefix, to avoid collision
-        random_string = uuid.uuid4()
         local_fp = os.path.join(temp_folder, "{}.{}".format(random_string, ref_db.split('/')[-1]))
 
         assert os.path.exists(local_fp) is False
@@ -242,20 +254,14 @@ def get_reference_database(ref_db, temp_folder):
         logging.info("Saving database to " + local_fp)
         run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', ref_db, local_fp])
 
-        # If the database was downloaded from S3, delete it when finished
-        delete_db_when_finished = True
-
-        return local_fp[:-5], delete_db_when_finished
+        return local_fp[:-5]
 
     else:
         # Treat the input as a local path
         logging.info("Getting reference database from local path: " + ref_db)
         assert os.path.exists(ref_db)
 
-        # Don't delete this database when finished
-        delete_db_when_finished = False
-
-        return ref_db, delete_db_when_finished
+        return ref_db
 
 
 def align_reads(read_fp,
@@ -386,28 +392,57 @@ if __name__ == "__main__":
         logging.info("Setting up scratch space ({}Gb)".format(args.scratch_size))
         make_scratch_space(args.scratch_size, args.temp_folder)
 
+    # Set a random string, which will be appended to all temporary files
+    random_string = uuid.uuid4()
+
     # Get the reference database
-    db_fp, delete_db_when_finished = get_reference_database(args.ref_db, args.temp_folder)
+    db_fp = get_reference_database(
+        args.ref_db,
+        args.temp_folder,
+        random_string=random_string
+    )
     logging.info("Reference database: " + db_fp)
 
     # Align each of the inputs and calculate the overall abundance
     for input_str in args.input.split(','):
         logging.info("Processing input argument: " + input_str)
-        calc_abund(input_str,              # ID for single sample to process
-                   db_fp,                  # Local path to DB
-                   args.ref_db,            # URL of ref DB, used for logging
-                   args.output_folder,     # Place to put results
-                   evalue=args.evalue,
-                   blocks=args.blocks,
-                   query_gencode=args.query_gencode,
-                   threads=args.threads,
-                   temp_folder=args.temp_folder,
-                   overwrite=args.overwrite)
+        # Capture in a try statement
+        try:
+            calc_abund(input_str,             # ID for single sample to process
+                       db_fp,                 # Local path to DB
+                       args.ref_db,           # URL of ref DB, used for logging
+                       args.output_folder,    # Place to put results
+                       evalue=args.evalue,
+                       blocks=args.blocks,
+                       query_gencode=args.query_gencode,
+                       threads=args.threads,
+                       temp_folder=args.temp_folder,
+                       random_string=random_string,
+                       overwrite=args.overwrite)
+        except:
+            # There was some error
+            # Capture the traceback
+            logging.info("There was an unexpected failure")
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            for line in traceback.format_tb(exc_traceback):
+                logging.info(line)
 
-    # Delete the reference database
-    if delete_db_when_finished:
-        logging.info("Deleting reference database: {}.dmnd".format(db_fp))
-        os.unlink(db_fp + ".dmnd")
+            # Delete any files that were created in this process
+            for fp in os.listdir(args.temp_folder):
+                if fp.startswith(random_string):
+                    logging.info("Deleting temporary file {}".format(fp))
+                    os.unlink(os.path.join(args.temp_folder, fp))
+
+            # Exit
+            logging.info("Exit type: {}".format(exc_type))
+            logging.info("Exit code: {}".format(exc_value))
+            sys.exit(exc_value)
+
+    # Delete any files that were created in this process
+    for fp in os.listdir(args.temp_folder):
+        if fp.startswith(str(random_string)):
+            logging.info("Deleting temporary file {}".format(fp))
+            os.unlink(os.path.join(args.temp_folder, fp))
 
     # Stop logging
     logging.info("Done")

@@ -11,8 +11,7 @@ WORKDIR /share
 
 # Add files
 RUN mkdir /usr/diamond
-ADD . /usr/diamond
-
+ADD requirements.txt /usr/diamond
 
 # Install python requirements
 RUN pip install -r /usr/diamond/requirements.txt && rm /usr/diamond/requirements.txt
@@ -35,9 +34,13 @@ RUN cd /usr/local/bin && \
 
 
 # Add the run script to the PATH
+ADD run.py /usr/diamond
+ADD helpers /usr/diamond/helpers
 RUN cd /usr/diamond && \
 	chmod +x run.py && \
 	ln -s /usr/diamond/run.py /usr/bin/
 
+
 # Run tests and then remove the folder
+ADD tests /usr/diamond/tests
 RUN bats /usr/diamond/tests/ && rm -r /usr/diamond/tests/
