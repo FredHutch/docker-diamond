@@ -132,6 +132,7 @@ def calc_abund(input_str,
         "output_folder": output_folder,
         "logs": logs,
         "ref_db": db_fp,
+        "ref_db_url": db_url,
         "results": abund_summary,
         "aligned_reads": aligned_reads,
         "time_elapsed": time.time() - start_time
@@ -313,6 +314,7 @@ def return_results(out, read_prefix, output_folder, temp_folder):
     if output_folder.startswith('s3://'):
         # Copy to S3
         run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', temp_fp, output_folder])
+        os.unlink(temp_fp)
     else:
         # Copy to local folder
         run_cmds(['mv', temp_fp, output_folder])
@@ -372,8 +374,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Set a random string, which will be appended to all temporary files
+    random_string = uuid.uuid4()
+
     # Set up logging
-    log_fp = 'log.txt'
+    log_fp = '{}-log.txt'.format(random_string)
     logFormatter = logging.Formatter('%(asctime)s %(levelname)-8s [run.py] %(message)s')
     rootLogger = logging.getLogger()
     rootLogger.setLevel(logging.INFO)
@@ -391,9 +396,6 @@ if __name__ == "__main__":
     if args.scratch_size is not None:
         logging.info("Setting up scratch space ({}Gb)".format(args.scratch_size))
         make_scratch_space(args.scratch_size, args.temp_folder)
-
-    # Set a random string, which will be appended to all temporary files
-    random_string = uuid.uuid4()
 
     # Get the reference database
     db_fp = get_reference_database(
@@ -429,7 +431,7 @@ if __name__ == "__main__":
 
             # Delete any files that were created in this process
             for fp in os.listdir(args.temp_folder):
-                if fp.startswith(random_string):
+                if fp.startswith(str(random_string)):
                     logging.info("Deleting temporary file {}".format(fp))
                     os.unlink(os.path.join(args.temp_folder, fp))
 
