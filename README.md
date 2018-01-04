@@ -8,17 +8,15 @@ Docker image running DIAMOND
 This repository provides a Docker image for running DIAMOND that is compatible with automated analysis on AWS Batch. Specifically, this image includes a wrapper script that:
 
 
-	1. Creates a working directory in memory as a ramdisk
+  1. Downloads reference databases
 
-    2. Downloads reference databases
+  2. Downloads input data
 
-    3. Downloads input data
+  3. Aligns reads with DIAMOND
 
-    4. Aligns reads with DIAMOND
+  4. Calculates summary statistics for each reference (coverage and depth)
 
-    5. Calculates summary statistics for each reference (coverage and depth)
-
-    6. Saves the outputs to stable file storage
+  5. Saves the outputs to stable file storage
 
 
 In order to be compatible with AWS Batch, all of these steps are parameterizable and are run with a single command.
@@ -37,10 +35,6 @@ Path to the DIAMOND reference database (file ending in .dmnd). Supports `s3://`,
 #### --output-folder
 
 Folder to place the output in, supporting either `s3://` or a local path. Output files will take the form of `<prefix>.json.gz`, where `<prefix>` is the SRA accession (if specified), or otherwise the prefix of the input file from S3 or ftp. 
-
-#### --scratch-size
-
-Size of the temporary folder that will be created to store the reference database, input data, temporary files, and output (in Gb). The folder will be created in memory, and so it will directly reduce the amount of memory that can be used for alignment.
 
 #### --evalue
 
@@ -73,7 +67,11 @@ The output of this analysis will summarize the abundance of each individual prot
   "input": <INPUT_DATA_PREFIX>,
   "output_folder": <OUTPUT_FOLDER_PATH>,
   "logs": <ANALYSIS_LOGS>,
-  "ref_db": <PATH_TO_REF_DB>,
+  "ref_db": <LOCAL_PATH_TO_REF_DB>,
+  "ref_db_url": <URL_FOR_REF_DB>,
+  "total_reads": <INT>,
+  "aligned_reads": <INT>,
+  "time_elapsed": <FLOAT_SECONDS>,
   "results": [
     {
       "id": "gene1",

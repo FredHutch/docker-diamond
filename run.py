@@ -370,12 +370,6 @@ def return_results(out, read_prefix, output_folder, temp_folder):
         run_cmds(['mv', temp_fp, output_folder])
 
 
-def make_scratch_space(scratch_size, temp_folder):
-    """Create scratch space using a ramdisk."""
-    run_cmds(['mount', '-t', 'tmpfs', '-o', 'size={}g'.format(scratch_size),
-              'tmpfs', temp_folder])
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="""
     Align a set of reads against a reference database with DIAMOND, and save the results.
@@ -396,10 +390,6 @@ if __name__ == "__main__":
     parser.add_argument("--overwrite",
                         action="store_true",
                         help="""Overwrite output files. Off by default.""")
-    parser.add_argument("--scratch-size",
-                        type=int,
-                        default=None,
-                        help="If specified, create a ramdisk of this size (Gb).")
     parser.add_argument("--evalue",
                         type=float,
                         default=0.00001,
@@ -441,11 +431,6 @@ if __name__ == "__main__":
     consoleHandler = logging.StreamHandler()
     consoleHandler.setFormatter(logFormatter)
     rootLogger.addHandler(consoleHandler)
-
-    # Set up the scratch space
-    if args.scratch_size is not None:
-        logging.info("Setting up scratch space ({}Gb)".format(args.scratch_size))
-        make_scratch_space(args.scratch_size, args.temp_folder)
 
     # Get the reference database
     db_fp = get_reference_database(
