@@ -104,7 +104,12 @@ class BlastParser:
 
                 ix += 1
 
-        # Add the final line
+        # Check if 0 reads were aligned
+        if ix == 0:
+            self.logging.info("Warning, no reads were aligned")
+            return
+
+        # Otherwise, add the final line
         if self.last_qseq != self.last_repeated_qseq:
             self.unique_bases[self.last_sid] += self.last_alen
             self.unique_reads[self.last_sid] += 1
