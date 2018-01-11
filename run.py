@@ -55,7 +55,8 @@ def calc_abund(input_str,
                threads=16,
                temp_folder='/mnt/temp',
                random_string=uuid.uuid4(),
-               overwrite=False):
+               overwrite=False,
+               align_mode="blastx"):
     """Align a set of reads against a reference database."""
 
     # Record the start time
@@ -111,7 +112,8 @@ def calc_abund(input_str,
                 threads=threads,
                 evalue=evalue,
                 blocks=blocks,
-                query_gencode=query_gencode)
+                query_gencode=query_gencode,
+                align_mode=align_mode)
 
     # Parse the alignment to get the abundance summary statistics
     logging.info("Parsing the output")
@@ -321,34 +323,61 @@ def align_reads(read_fp,
                 threads=16,
                 evalue=0.00001,
                 blocks=1,
-                query_gencode=11):
+                query_gencode=11,
+                align_mode="blastx"):
     """Align the reads against the reference database."""
-    run_cmds(["diamond",
-              "blastx",
-              "--threads",
-              str(threads),
-              "--query",
-              read_fp,
-              "--db",
-              db_fp,
-              "--outfmt",
-              "6",
-              "qseqid",
-              "sseqid",
-              "slen",
-              "sstart",
-              "send",
-              "qseq",
-              "--out",
-              blast_fp,
-              "--top",
-              "0",
-              "--evalue",
-              str(evalue),
-              "-b",
-              str(blocks),
-              "--query-gencode",
-              str(query_gencode)])
+    if align_mode == "blastx":
+        run_cmds(["diamond",
+                  "blastx",
+                  "--threads",
+                  str(threads),
+                  "--query",
+                  read_fp,
+                  "--db",
+                  db_fp,
+                  "--outfmt",
+                  "6",
+                  "qseqid",
+                  "sseqid",
+                  "slen",
+                  "sstart",
+                  "send",
+                  "qseq",
+                  "--out",
+                  blast_fp,
+                  "--top",
+                  "0",
+                  "--evalue",
+                  str(evalue),
+                  "-b",
+                  str(blocks),
+                  "--query-gencode",
+                  str(query_gencode)])
+    elif align_mode == "blastp":
+        run_cmds(["diamond",
+                  "blastp",
+                  "--threads",
+                  str(threads),
+                  "--query",
+                  read_fp,
+                  "--db",
+                  db_fp,
+                  "--outfmt",
+                  "6",
+                  "qseqid",
+                  "sseqid",
+                  "slen",
+                  "sstart",
+                  "send",
+                  "qseq",
+                  "--out",
+                  blast_fp,
+                  "--top",
+                  "0",
+                  "--evalue",
+                  str(evalue),
+                  "-b",
+                  str(blocks)])
 
 
 def return_results(out, read_prefix, output_folder, temp_folder):
@@ -399,6 +428,10 @@ if __name__ == "__main__":
                         default=5,
                         help="""Number of blocks used when aligning.
                               Value relates to the amount of memory used.""")
+    parser.add_argument("--align-mode",
+                        type=str,
+                        default="blastx",
+                        help="Input is nucleotide (blastx) or protein (blastp).")
     parser.add_argument("--query-gencode",
                         type=int,
                         default=11,
@@ -413,6 +446,9 @@ if __name__ == "__main__":
                         help="Folder used for temporary files (and ramdisk, if specified).")
 
     args = parser.parse_args()
+
+    # Make sure that the align mode is either blastx or blastp
+    assert args.align_mode in ["blastx", "blastp"]
 
     # Set a random string, which will be appended to all temporary files
     random_string = uuid.uuid4()
@@ -455,7 +491,8 @@ if __name__ == "__main__":
                        threads=args.threads,
                        temp_folder=args.temp_folder,
                        random_string=random_string,
-                       overwrite=args.overwrite)
+                       overwrite=args.overwrite,
+                       align_mode=args.align_mode)
         except:
             # There was some error
             # Capture the traceback
