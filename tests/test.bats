@@ -28,6 +28,8 @@
   output="$(cat output.json)"
   [[ "$output" =~ "\"id\": \"EcoRI\"" ]]
   [[ "$output" =~ "\"total_depth\": 0.8845" ]]
+  [[ "$output" =~ "\"total_reads\": 5" ]]
+  [[ "$output" =~ "\"unique_reads\": 5" ]]
   [[ "$output" =~ "\"total_coverage\": 0.8845" ]]
   [[ "$output" =~ "\"unique_coverage\": 0.8845" ]]
 }
@@ -37,6 +39,8 @@
   output="$(cat output.json)"
   [[ "$output" =~ "\"id\": \"EcoRI\"" ]]
   [[ "$output" =~ "\"total_depth\": 0.8845" ]]
+  [[ "$output" =~ "\"total_reads\": 5" ]]
+  [[ "$output" =~ "\"unique_reads\": 4" ]]
   [[ "$output" =~ "\"total_coverage\": 0.8845" ]]
   [[ "$output" =~ "\"unique_coverage\": 0.7076" ]]
 }

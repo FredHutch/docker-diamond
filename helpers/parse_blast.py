@@ -10,7 +10,7 @@ class BlastParser:
     """Object to parse a set of BLAST results."""
 
     def __init__(self, blast_fp,
-                 qid_ix=0, sid_ix=1, slen_ix=2, sstart_ix=3, send_ix=4, qseq_ix=5,
+                 qid_ix=0, sid_ix=1, slen_ix=2, sstart_ix=3, send_ix=4,
                  comment_char='@', sep='\t', logging=False):
         """Parse a set of BLAST results."""
         # Store the input variables
@@ -20,20 +20,9 @@ class BlastParser:
         self.slen_ix = slen_ix
         self.sstart_ix = sstart_ix
         self.send_ix = send_ix
-        self.qseq_ix = qseq_ix
         self.comment_char = comment_char
         self.sep = sep
         self.logging = logging
-
-        # Store the results of the previous alignment
-        self.last_qid = None
-        self.last_sid = None
-        self.last_qseq = None
-        self.last_alen = None
-        self.last_pos_range = set([])
-
-        # Store the most recent repeated sequence
-        self.last_repeated_qseq = ''
 
         # Number of reads and bases aligned to each reference
         self.total_reads = defaultdict(int)
@@ -51,76 +40,95 @@ class BlastParser:
         # The total length of each reference
         self.ref_len = {}
 
-        # Set the highest number of fields that we might have to parse from a line
-        self.max_fields = max(sid_ix, slen_ix, sstart_ix, send_ix, qseq_ix) + 1
+        # Set the highest number of fields that we might have to parse
+        self.max_fields = max(sid_ix, slen_ix, sstart_ix, send_ix) + 1
 
-    def parse(self):
-        """Parse the file."""
+    def yield_alignments(self):
+        """Iterate over an alignment file, and yield chunks for each query."""
 
-        with open(self.blast_fp) as f:
-            ix = 0
+        # Counter for the number of lines processed
+        ix = 0
+
+        # The previous query ID
+        last_qid = None
+
+        # Keep a list of all of the alignments for a single query
+        query_alignments = []
+
+        # Iterate over the file, line by line
+        with open(self.blast_fp, "rt") as f:
             for line in f:
-                if ix % 100000 == 0:
-                    if self.logging:
-                        self.logging.info("Processed {} alignments".format(ix))
+                # Logging
+                if ix % 100000 == 0 and ix > 0 and self.logging:
+                    self.logging.info("Processed {:,} alignments".format(ix))
+
                 # Skip lines starting with '@', by default
                 if line[0] == self.comment_char:
                     continue
 
-                qid, sid, qseq, sstart, send, slen = self.parse_line(line)
+                # Parse the line
+                qid, sid, sstart, send, slen = self.parse_line(line)
 
-                # If this is a new query, increment the counter
-                if qid != self.last_qid:
-                    self.total_aligned_reads += 1
-                    self.last_qid = qid
+                # If this is a new query, yield the batch of alignments
+                if qid != last_qid:
+                    # This skips the first line
+                    if last_qid is not None:
+                        yield query_alignments
+                        # Clear the cache of alignments
+                        query_alignments = []
+                    last_qid = qid
 
+                # Append the alignment information for this line
+                query_alignments.append((qid, sid, sstart, send, slen))
+
+                # Increment the line counter
+                ix += 1
+
+        yield query_alignments
+
+        msg = "Processed {:,} alignments".format(ix)
+        if self.logging:
+            self.logging.info(msg)
+
+    def parse(self):
+        """Parse the file."""
+
+        # Yield groups of alignments, all for a single query sequence
+        for alignments in self.yield_alignments():
+
+            # Keep track of how many reads were aligned
+            self.total_aligned_reads += 1
+
+            # If there is only one alignment, then it was unique
+            is_unique = len(alignments) == 1
+
+            # Process each of the alignments
+            for qid, sid, sstart, send, slen in alignments:
                 # Calculate the alignment length
                 alen = send - sstart
 
-                # If this is the first time we've seen this subject, add the length
+                # Subject region covered by the alignment
+                pos_range = set(range(sstart, send))
+
+                # Add the length of the subject, if needed
                 if sid not in self.ref_len:
                     self.ref_len[sid] = float(slen)
 
-                # For the first alignment, just set the "last_*" variables and move on
-                if ix > 0:
-                    # Check to see if this alignment is repeated the same query sequence
-                    if qseq == self.last_qseq:
-                        self.last_repeated_qseq = qseq
-                    # If the last alignment was unique, add it as such
-                    if self.last_qseq != self.last_repeated_qseq:
-                        # The previous alignment was unique
-                        self.unique_bases[self.last_sid] += self.last_alen
-                        self.unique_reads[self.last_sid] += 1
-                        # Add the alignment positions
-                        self.unique_pos[self.last_sid] |= self.last_pos_range
-                    # No matter what, add the total reads and bases for the previous sequence
-                    self.total_bases[self.last_sid] += self.last_alen
-                    self.total_reads[self.last_sid] += 1
-                    self.total_pos[self.last_sid] |= self.last_pos_range
-                self.last_qseq = qseq
-                self.last_sid = sid
-                self.last_alen = alen
-                self.last_pos_range = set(range(sstart, send))
+                # Add the unique alignment information
+                if is_unique:
+                    self.unique_bases[sid] += alen
+                    self.unique_reads[sid] += 1
+                    # Add the alignment positions
+                    self.unique_pos[sid] |= pos_range
 
-                ix += 1
+                # No matter what, add to the totals
+                self.total_bases[sid] += alen
+                self.total_reads[sid] += 1
+                self.total_pos[sid] |= pos_range
 
         # Check if 0 reads were aligned
-        if ix == 0:
+        if self.total_aligned_reads == 0:
             self.logging.info("Warning, no reads were aligned")
-            return
-
-        # Otherwise, add the final line
-        if self.last_qseq != self.last_repeated_qseq:
-            self.unique_bases[self.last_sid] += self.last_alen
-            self.unique_reads[self.last_sid] += 1
-            self.unique_pos[self.last_sid] |= self.last_pos_range
-        self.total_bases[self.last_sid] += self.last_alen
-        self.total_reads[self.last_sid] += 1
-        self.total_pos[self.last_sid] |= self.last_pos_range
-
-        msg = "Processed {} alignments, {} total aligned reads".format(ix, self.total_aligned_reads)
-        if self.logging:
-            self.logging.info(msg)
 
     def parse_line(self, line):
         """Parse one line."""
@@ -135,12 +143,6 @@ class BlastParser:
         # Query ID
         qid = line[self.qid_ix]
 
-        # Aligned query sequence
-        qseq = line[self.qseq_ix]
-        if qseq == '*':
-            # Read is not aligned
-            return None, None, None, None, None, None
-
         # Alignment positions
         sstart = int(line[self.sstart_ix])  # Position of alignment start on subject
         send = int(line[self.send_ix])  # Position of alignment end on subject
@@ -154,7 +156,7 @@ class BlastParser:
         # Total subject (reference) length
         slen = int(line[self.slen_ix])
 
-        return qid, sid, qseq, sstart, send, slen
+        return qid, sid, sstart, send, slen
 
     def make_summary(self):
         """Make the final output."""
@@ -174,9 +176,16 @@ class BlastParser:
             # Coverage = number of positions covered / reference length
             d['total_coverage'] = round(len(self.total_pos[k]) / rl, 4)
             d['unique_coverage'] = round(len(self.unique_pos[k]) / rl, 4)
-            # RPKM = aligned reads / kilobase of reference / million aligned reads
-            d['total_rpkm'] = round(self.rpkm(self.total_reads[k], rl, self.total_aligned_reads), 6)
-            d['unique_rpkm'] = round(self.rpkm(self.unique_reads[k], rl, self.total_aligned_reads), 6)
+            # RPKM = aligned reads / kb of reference / million aligned reads
+            d['total_rpkm'] = round(
+                self.rpkm(self.total_reads[k], rl, self.total_aligned_reads),
+                6)
+            d['unique_rpkm'] = round(
+                self.rpkm(self.unique_reads[k], rl, self.total_aligned_reads),
+                6)
+            # Number of reads
+            d["total_reads"] = self.total_reads[k]
+            d["unique_reads"] = self.unique_reads[k]
 
             out.append(d)
 
