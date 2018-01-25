@@ -13,6 +13,7 @@ import traceback
 import subprocess
 from helpers.parse_blast import BlastParser
 from helpers.fastq_utils import count_fastq_reads
+from helpers.fastq_utils import clean_fastq_headers
 
 
 def run_cmds(commands, retry=0, catchExcept=False):
@@ -266,8 +267,8 @@ def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
         logging.info("Treating as local path")
         msg = "Input file does not exist ({})".format(input_str)
         assert os.path.exists(input_str), msg
-        logging.info("Making symbolic link in temporary folder")
-        os.symlink(input_str, local_path)
+        logging.info("Copying to temporary folder, cleaning up headers")
+        clean_fastq_headers(input_str, local_path)
         return local_path
 
     # Get files from AWS S3
@@ -296,8 +297,14 @@ def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
     new_path = local_path.split('/')
     new_path[-1] = "{}-{}".format(random_string, new_path[-1])
     new_path = '/'.join(new_path)
-    logging.info("Moving {} to {}".format(local_path, new_path))
-    os.rename(local_path, new_path)
+    logging.info(
+        "Copying {} to {}, cleaning up FASTQ headers".format(
+            local_path, new_path
+            )
+        )
+    clean_fastq_headers(local_path, new_path)
+    logging.info("Deleting old file: {}".format(local_path))
+    os.unlink(local_path)
     return new_path
 
 
