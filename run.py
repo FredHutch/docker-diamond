@@ -253,10 +253,8 @@ def sra_url(accession):
 
 
 def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
-    """Get a set of reads from a URL -- return the downloaded filepath and file prefix."""
+    """Get a set of reads from a URL -- return the downloaded filepath."""
     logging.info("Getting reads from {}".format(input_str))
-    error_msg = "{} must start with s3://, sra://, or ftp://".format(input_str)
-    assert input_str.startswith(('s3://', 'sra://', 'ftp://')), error_msg
 
     filename = input_str.split('/')[-1]
     local_path = os.path.join(temp_folder, filename)
@@ -264,10 +262,21 @@ def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
     logging.info("Filename: " + filename)
     logging.info("Local path: " + local_path)
 
+    if not input_str.startswith(('s3://', 'sra://', 'ftp://')):
+        logging.info("Treating as local path")
+        msg = "Input file does not exist ({})".format(input_str)
+        assert os.path.exists(input_str), msg
+        logging.info("Making symbolic link in temporary folder")
+        os.symlink(input_str, local_path)
+        return local_path
+
     # Get files from AWS S3
     if input_str.startswith('s3://'):
         logging.info("Getting reads from S3")
-        run_cmds(['aws', 's3', 'cp', '--quiet', '--sse', 'AES256', input_str, temp_folder])
+        run_cmds([
+            'aws', 's3', 'cp', '--quiet', '--sse',
+            'AES256', input_str, temp_folder
+            ])
 
     # Get files from an FTP server
     elif input_str.startswith('ftp://'):
