@@ -24,11 +24,21 @@
 }
 
 @test "Parse BLAST results" {
-  python /usr/diamond/helpers/parse_blast.py --input /usr/diamond/tests/reads.blast --out output.json
+  python /usr/diamond/helpers/parse_blast.py --input /usr/diamond/tests/unique_sequences.blast --out output.json
   output="$(cat output.json)"
   [[ "$output" =~ "\"id\": \"EcoRI\"" ]]
   [[ "$output" =~ "\"total_depth\": 0.8845" ]]
   [[ "$output" =~ "\"total_coverage\": 0.8845" ]]
+  [[ "$output" =~ "\"unique_coverage\": 0.8845" ]]
+}
+
+@test "Parse BLAST results (non-unique reads)" {
+  python /usr/diamond/helpers/parse_blast.py --input /usr/diamond/tests/non_unique_sequences.blast --out output.json
+  output="$(cat output.json)"
+  [[ "$output" =~ "\"id\": \"EcoRI\"" ]]
+  [[ "$output" =~ "\"total_depth\": 0.8845" ]]
+  [[ "$output" =~ "\"total_coverage\": 0.8845" ]]
+  [[ "$output" =~ "\"unique_coverage\": 0.7076" ]]
 }
 
 @test "Make sure the run script is in the PATH" {
