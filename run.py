@@ -268,7 +268,15 @@ def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
         msg = "Input file does not exist ({})".format(input_str)
         assert os.path.exists(input_str), msg
         logging.info("Copying to temporary folder, cleaning up headers")
+
+        # Add a random string to the filename
+        local_path = local_path.split('/')
+        local_path[-1] = "{}-{}".format(random_string, local_path[-1])
+        local_path = '/'.join(local_path)
+
+        # Make the FASTQ headers unique
         clean_fastq_headers(input_str, local_path)
+
         return local_path
 
     # Get files from AWS S3
