@@ -208,14 +208,12 @@ def get_sra(accession, temp_folder):
                 os.unlink(fp)
     else:
         logging.info("No files found on ENA, trying SRA")
-        local_sra_path = os.path.join(temp_folder, accession + ".sra")
         run_cmds([
-            "curl", "-o",
-            local_sra_path,
-            sra_url(accession)])
-        run_cmds([
-            "fastq-dump", "--split-files", "--outdir", temp_folder, local_sra_path
-        ])
+            "fastq-dump",
+            "--split-files",
+            "--outdir",
+            temp_folder, accession])
+
         # Combine any multiple files that were found
         with open(local_path + ".temp", "wt") as fo:
             cmd = "cat {}/{}*fastq".format(temp_folder, accession)
@@ -229,28 +227,9 @@ def get_sra(accession, temp_folder):
         msg = "File could not be downloaded from SRA: {}".format(accession)
         assert os.path.exists(local_path), msg
 
-        # Remove the temporary SRA file
-        run_cmds(["rm", local_sra_path])
-
     # Return the path to the file
     logging.info("Done fetching " + accession)
     return local_path
-
-
-def sra_url(accession):
-    """Path to the SRA file accessible via FTP."""
-    base = "ftp://ftp-trace.ncbi.nih.gov/sra/sra-instant/reads/ByRun/sra"
-    first_three = accession[:3]
-    first_six = accession[:6]
-    url = "{}/{}/{}/{}/{}.sra"
-    url = url.format(
-        base,
-        first_three,
-        first_six,
-        accession,
-        accession
-        )
-    return url
 
 
 def get_reads_from_url(input_str, temp_folder, random_string=uuid.uuid4()):
