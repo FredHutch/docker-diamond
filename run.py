@@ -7,6 +7,7 @@ import time
 import json
 import uuid
 import boto3
+import shutil
 import logging
 import argparse
 import traceback
@@ -482,6 +483,16 @@ if __name__ == "__main__":
     # Align each of the inputs and calculate the overall abundance
     for input_str in args.input.split(','):
         logging.info("Processing input argument: " + input_str)
+        
+        # Make a temporary folder for all of the files for this sample
+        sample_temp_folder = os.path.join(args.temp_folder, str(uuid.uuid4()))
+        
+        # Don't use a folder that already exists
+        assert os.path.exists(sample_temp_folder) is False
+
+        # Make the folder
+        os.mkdir(sample_temp_folder)
+
         # Capture in a try statement
         try:
             calc_abund(input_str,             # ID for single sample to process
@@ -492,7 +503,7 @@ if __name__ == "__main__":
                        blocks=args.blocks,
                        query_gencode=args.query_gencode,
                        threads=args.threads,
-                       temp_folder=args.temp_folder,
+                       temp_folder=sample_temp_folder,
                        random_string=random_string,
                        overwrite=args.overwrite,
                        align_mode=args.align_mode)
@@ -504,19 +515,21 @@ if __name__ == "__main__":
             for line in traceback.format_tb(exc_traceback):
                 logging.info(line)
 
-            # Delete any files that were created in this process
-            for fp in os.listdir(args.temp_folder):
-                if fp.startswith(str(random_string)) or \
-                   fp.startswith(input_str.split('/')[-1]):
-                    logging.info("Deleting temporary file {}".format(fp))
-                    os.unlink(os.path.join(args.temp_folder, fp))
+            # Delete any files that were created for this sample
+            logging.info("Removing temporary folder: " + sample_temp_folder)
+            shutil.rmtree(sample_temp_folder)
 
             # Exit
             logging.info("Exit type: {}".format(exc_type))
             logging.info("Exit code: {}".format(exc_value))
             sys.exit(exc_value)
 
-    # Delete any files that were created in this process
+        # Delete any files that were created for this sample
+        logging.info("Removing temporary folder: " + sample_temp_folder)
+        shutil.rmtree(sample_temp_folder)
+
+    # Delete any other files that were created in this process
+    # This should only be the reference database, if it was downloaded
     for fp in os.listdir(args.temp_folder):
         if fp.startswith(str(random_string)):
             logging.info("Deleting temporary file {}".format(fp))
