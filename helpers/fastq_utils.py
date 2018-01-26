@@ -47,7 +47,7 @@ def clean_fastq_headers(fp_in, fp_out):
     # 2. Headers are stripped to the first whitespace
     # 3. Headers are unique
     # 4. Sequence lines are not empty
-    # 5. Spacer lines start with '+'
+    # 5. Spacer lines match the header line
     # 6. Quality lines are not empty
 
     with open(fp_in, "rt") as f_in:
@@ -70,13 +70,17 @@ def clean_fastq_headers(fp_in, fp_out):
                     # 3. Add a unique line number and the newline
                     line = "{}-r{}\n".format(line, 1 + (ix / 4))
 
+                    # Save the header to use for the spacer line
+                    header = line[1:]
+
                 elif mod == 1:
                     # 4. Sequence lines are not empty
                     assert len(line) > 1
 
                 elif mod == 2:
-                    # 5. Spacer lines start with '+'
+                    # 5. Spacer lines start with '+' and match the header
                     assert line[0] == "+"
+                    line = "+" + header
 
                 elif mod == 3:
                     # 6. Quality lines are not empty
