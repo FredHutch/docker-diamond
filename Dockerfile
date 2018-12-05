@@ -17,9 +17,9 @@ ADD requirements.txt /usr/diamond
 RUN pip install -r /usr/diamond/requirements.txt && rm /usr/diamond/requirements.txt
 
 
-# Install DIAMOND v0.9.10
+# Install DIAMOND v0.9.23
 RUN cd /usr/diamond && \
-	wget https://github.com/bbuchfink/diamond/releases/download/v0.9.10/diamond-linux64.tar.gz && \
+	wget https://github.com/bbuchfink/diamond/releases/download/v0.9.23/diamond-linux64.tar.gz && \
 	tar xzvf diamond-linux64.tar.gz && \
 	mv diamond /usr/bin/ && \
 	rm diamond-linux64.tar.gz
