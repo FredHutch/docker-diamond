@@ -56,3 +56,10 @@
 
   [[ "$h" =~ "Run BLAST (DIAMOND) on a pair of FASTA files" ]]
 }
+
+@test "Test run_blast.py script" {
+  run_blast.py --query /usr/diamond/tests/ref.fastp --subject /usr/diamond/tests/ref.fastp --out /usr/diamond/tests/blastp.aln.gz
+
+  [[ -s /usr/diamond/tests/blastp.aln.gz ]]
+  [[ $(gzip -t /usr/diamond/tests/blastp.aln.gz) ]]
+}

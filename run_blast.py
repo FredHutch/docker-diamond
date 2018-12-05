@@ -255,11 +255,17 @@ if __name__ == "__main__":
         arg_list = arg_list + [
             "--compress", "1"
         ]
+        output_fp = output_fp + ".gz"
 
     # Run the command
     try:
-            run_cmds(arg_list)
+        run_cmds(arg_list)
     except:
+        exit_and_clean_up(temp_folder)
+
+    if not os.path.exists(output_fp):
+        logging.info(
+            "The output file ({}) does not exist, exiting".format(output_fp))
         exit_and_clean_up(temp_folder)
 
     # Return the results
