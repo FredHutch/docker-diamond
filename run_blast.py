@@ -240,7 +240,7 @@ if __name__ == "__main__":
         "--out", output_fp,
         "--outfmt", args.outfmt,
         "--id", str(args.perc_identity),
-        "--max_target_seqs", str(args.max_target_seqs),
+        "--max-target-seqs", str(args.max_target_seqs),
         "--query-cover", str(args.query_cover),
         "--subject-cover", str(args.subject_cover),
         "--threads", str(args.threads)
