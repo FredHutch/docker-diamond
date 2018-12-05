@@ -61,5 +61,5 @@
   run_blast.py --query /usr/diamond/tests/ref.fastp --subject /usr/diamond/tests/ref.fastp --output-aln /usr/diamond/tests/blastp.aln.gz --output-log /usr/diamond/tests/blastp.log
 
   [[ -s /usr/diamond/tests/blastp.aln.gz ]]
-  [[ $(gzip -t /usr/diamond/tests/blastp.aln.gz) ]]
+  [[ -s /usr/diamond/tests/blastp.log ]]
 }

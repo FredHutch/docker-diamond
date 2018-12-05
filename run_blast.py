@@ -56,7 +56,7 @@ def get_file_from_url(url_path, temp_folder):
     logging.info("Filename: " + filename)
     logging.info("Local path: " + local_path)
 
-    if "://" in url_path is False:
+    if "://" not in url_path:
         logging.info("Treating as local path")
         msg = "Input file does not exist ({})".format(url_path)
         assert os.path.exists(url_path), msg
