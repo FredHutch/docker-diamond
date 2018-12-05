@@ -50,3 +50,9 @@
 
   [[ "$h" =~ "Align a set of reads against a reference database with DIAMOND" ]]
 }
+
+@test "Make sure the run_blast.py script is in the PATH" {
+  h="$(run_blast.py -h)"
+
+  [[ "$h" =~ "Align a set of reads against a reference database with DIAMOND" ]]
+}

@@ -103,7 +103,7 @@ def exit_and_clean_up(temp_folder):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="""
-    Run BLAST on a pair of FASTA files.
+    Run BLAST (DIAMOND) on a pair of FASTA files.
     """)
 
     parser.add_argument("--query",

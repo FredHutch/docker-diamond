@@ -37,8 +37,8 @@ RUN cd /usr/local/bin && \
 ADD run.py /usr/diamond
 ADD helpers /usr/diamond/helpers
 RUN cd /usr/diamond && \
-	chmod +x run.py && \
 	ln -s /usr/diamond/run.py /usr/bin/
+ADD run_blast.py /usr/bin
 
 
 # Run tests and then remove the folder
