@@ -5,9 +5,9 @@ MAINTAINER sminot@fredhutch.org
 RUN apt-get update && \
 	apt-get install -y wget curl
 
-# Install DIAMOND v0.9.31
+# Install DIAMOND v2.0.6
 RUN mkdir /usr/diamond && cd /usr/diamond && \
-	wget https://github.com/bbuchfink/diamond/releases/download/v0.9.31/diamond-linux64.tar.gz && \
+	wget https://github.com/bbuchfink/diamond/releases/download/v2.0.6/diamond-linux64.tar.gz && \
 	tar xzvf diamond-linux64.tar.gz && \
 	mv diamond /usr/bin/ && \
 	rm diamond-linux64.tar.gz
